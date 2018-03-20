@@ -1,0 +1,891 @@
+---
+title: "Medienseminar - Happy Feet - QS"
+author: "David Izydorczyk, J. A., M. G., K. K., M. Z., N. B. "
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    code_folding: show
+    highlight: tango
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_float: yes
+    df_print: paged
+    keep_md: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r packages, include=FALSE }
+# Check if packages are installed, if not install and load them
+
+## Make list of required packages 
+
+list.of.packages <- c("dplyr","psych","mvoutlier","ggplot2","tidyr",
+                      "mvnormtest","scales","ruler","car","HH",
+                      "reshape2","pastecs","lavaan","WRS")
+
+## compare installed and required packages
+
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+
+# installed the not yet installed but required packages and load them
+
+if(length(new.packages)) install.packages(new.packages,dependencies = TRUE)
+sapply(list.of.packages, require, character.only = TRUE)
+```
+
+
+```{r}
+load("QS_Medienseminar_Izydorczyk.Rdata")
+```
+
+
+# Despriptive Statistiken
+
+```{r attachQS}
+    attach(QS)
+```
+
+## Bedingungen 
+
+```{r}
+    table(bedingung)
+    table(bedingung)/length(bedingung)
+```
+
+## Geschlecht 
+
+```{r}
+      table(geschlecht)
+      table(geschlecht)/nrow(QS)
+    
+      QS %>% group_by(bedingung, geschlecht) %>% count()
+```
+   
+## Alter 
+
+```{r}
+      summary(alter)
+      QS %>% group_by(bedingung) %>% summarise(average_age = mean(alter,na.rm=T))
+      QS %>% group_by(bedingung, geschlecht) %>% summarise(average_age = mean(alter,na.rm=T))
+     
+      boxplot(alter)
+```
+
+## Anzahl NAs
+
+```{r}
+      table(Anz_na)
+      summary(Anz_na)
+      hist(Anz_na)
+```
+
+## Duration (in Sekunden)
+
+```{r}
+      describe(duration) %>% knitr::kable()
+      hist(duration)
+      describeBy(duration, group=bedingung) 
+      
+      boxplot(duration)
+```
+
+## Tracking (0 = Nein, 1 = JA)
+
+```{r}
+      table(tracking)
+      table(tracking_dauer)
+      #table(tracking_wie)
+```
+
+## Lauferfahrung  
+
+```{r}
+      describe(lauferfahrung) %>% knitr::kable()
+      hist(lauferfahrung)
+      describeBy(lauferfahrung, group=bedingung) 
+      boxplot(lauferfahrung)
+```
+
+## KM pro Woche
+
+```{r}
+      describe(km_per_week) %>% knitr::kable()
+      hist(km_per_week)
+      describeBy(km_per_week, group=bedingung)
+      boxplot(km_per_week)
+```
+
+
+## KM n?chste Woche
+      
+```{r}
+      describe(km_next_week) %>% knitr::kable()
+      hist(km_next_week)
+      describeBy(km_next_week, group=bedingung)
+```     
+      
+## Differenz
+      
+```{r}
+      describe(km_next_week-km_per_week) %>% knitr::kable()
+      hist(km_next_week-km_per_week)
+      describeBy(km_next_week-km_per_week, group=bedingung) 
+      boxplot(km_next_week)
+```      
+      
+      
+      
+```{r detach QS}
+      detach(QS)
+```
+
+
+## Korrelation der Motivation zu laufen ITems
+
+```{r}
+corr.test(QS[,c("diff_rs","MO_laufen")])
+ 
+```
+
+
+
+
+
+
+
+
+
+
+# Filtern von Personen 
+
+Die Zeiten der Personen sehen alle sinnvoll aus, siehe Duration.  Es gibt jedoch eine Personen mit relativ viele NAs
+
+```{r}
+temp <- dplyr::select(QS,geschlecht:untersucht,Anz_na) %>% filter(.,Anz_na>0)
+```
+
+Anscheinend haben diese Personen fehlende Werte bei den Motivationsskalen. -> Werden erstmal auch
+
+
+```{r}
+QS <- filter(QS,Anz_na==0)
+```
+ 
+
+Die Person mit NA auf km_peer_Week ausschlie?en. 
+
+```{r}
+QS <- filter(QS,!is.na(km_per_week))
+``` 
+   
+Person die weniger als 2 Woche trackt ausschlie?en 
+     
+```{r}
+QS <- filter(QS,tracking_dauer==1)
+```
+  
+**Es bleiben noch `r nrow(QS)` Personen.**
+
+## Neue Demographie und deskriptive Statistiken
+
+### Geschlecht 
+
+```{r}
+      table(QS$geschlecht)
+      table(QS$geschlecht)/nrow(QS)
+    
+      QS %>% group_by(bedingung, geschlecht) %>% count()
+```
+   
+### Alter 
+
+
+```{r}
+      describe(QS$alter) %>% knitr::kable()
+      QS %>% group_by(bedingung) %>% summarise(average_age = mean(alter,na.rm=T))
+      QS %>% group_by(bedingung, geschlecht) %>% summarise(average_age = mean(alter,na.rm=T))
+     
+      boxplot(QS$alter)
+```
+
+### Lauferfahrung/Km peer Week
+
+```{r}
+
+levels(QS$bedingung) <- c("upwards","downwards","equal","control")
+
+
+table(QS$bedingung, QS$geschlecht)
+
+QS %>% group_by(.,bedingung) %>% 
+             dplyr::summarize(., meanKM    = mean(km_per_week),
+                                 sdKM      = sd(km_per_week), 
+                                 meanLE    = mean(lauferfahrung),
+                                 sdLE      = sd(lauferfahrung),
+                                 meanAge   = mean(alter),
+                                 sdAge     = sd(alter))  
+
+describe(QS$km_per_week) %>% knitr::kable()
+describe(QS$lauferfahrung) %>% knitr::kable()
+
+
+psych::corr.test(QS[,c("lauferfahrung", "km_per_week", "alter")])
+```
+
+
+
+# Reliabilit?ten (Cronbachs Alpha)
+
+## Motivation zu tracken 
+
+### Self - Entertainment
+
+```{r}
+psych::alpha(QS[,11:15])
+```
+
+### Self - Association
+
+```{r}
+psych::alpha(QS[,16:19])
+```
+
+### Self - Design
+
+```{r}
+psych::alpha(QS[,20:24])
+```
+
+### Self - Discipline
+
+```{r}
+psych::alpha(QS[,25:27])
+```
+
+
+### Self - Healing
+
+```{r}
+psych::alpha(QS[,28:29])
+```
+
+### Self - Overall
+
+```{r}
+psych::alpha(QS[,11:29])#overall
+```
+
+```{r}
+    # QS$MO_tracking_self_entertainment <- rowMeans(QS[,11:15],na.rm=TRUE)
+    # QS$MO_tracking_self_association   <- rowMeans(QS[,16:19],na.rm=TRUE)
+    # QS$MO_tracking_self_design        <- rowMeans(QS[,20:24],na.rm=TRUE)
+    # QS$MO_tracking_self_discipline    <- rowMeans(QS[,25:27],na.rm=TRUE)
+    # QS$MO_tracking_self_healing       <- rowMeans(QS[,28:29],na.rm=TRUE)  
+ 
+```
+
+
+## Motivation zu Laufen
+
+```{r}
+corr.test(QS[,c("diff_rs","MO_laufen","diff","km_next_week")])
+
+psych::alpha(QS[,c("diff_rs","MO_laufen")])
+```
+
+
+
+# Inferenz Statistik
+
+## ANOVA - Motivation zu Laufen 
+
+### Deskriptive Mittelwerte
+
+```{r}
+describeBy(QS$MO_laufen_ges, group=QS$bedingung)
+```
+
+### Plots
+
+```{r}
+id <- QS %>% group_by(.,bedingung) %>% 
+             dplyr::summarize(., mean    = mean(MO_laufen_ges),
+                                 se      = sd(MO_laufen_ges)/sqrt(length(MO_laufen_ges)))  
+QS$VPN <- 1:nrow(QS)
+
+
+ggplot(id, aes(x=bedingung, y=mean,fill=bedingung)) + 
+    geom_bar(position=position_dodge(), stat="identity",colour="black",, width=.5) +
+    scale_fill_manual(values=c("grey80","grey60","grey40", "grey20")) +
+    scale_y_continuous("Motivation to jog", expand=c(0,0), limits = c(0, 85) ) +
+    scale_x_discrete(name="Condition", labels=c("upwards", "downwards","equal","control")) +
+    geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, alpha = .4, position=position_dodge(.9))  +
+    geom_point(data=QS, aes(x=bedingung, y=MO_laufen_ges,group=VPN),shape = 21, alpha = .2,position=position_dodge(0.2)) +
+     theme_bw() +
+        labs(
+          #title = "Correct Rejection Rate ",
+          x = "Bedingungen",
+          y = "Motivation zu laufen",
+          color = NULL
+        ) + guides(fill=FALSE)
+
+
+ 
+
+ggplot(QS, aes(x=MO_laufen_ges,fill=bedingung)) +
+          geom_density(alpha=0.4) +
+          theme_bw() +
+           scale_x_continuous(expand=c(0,0), limits = c(0, 100) ) +
+              labs(
+                title = "Verteilung der Motivation zu laufen",
+                x = "Motivation zu laufen",
+                y = "H?ufigkeit",
+                color = NULL
+              ) 
+
+
+#ggsave("plotMotivationszulaufenDistribution.png",dpi=900,width=12,height=7, units = "cm",bg = "transparent")
+```
+
+### ANOVA 
+
+```{r}
+
+library(lsr)
+motLauf <-aov(MO_laufen_ges~bedingung,data=QS)
+summary(motLauf)
+etaSquared( aov(MO_laufen_ges~bedingung,data=QS), type = 2, anova = FALSE )
+
+QS$MO_laufen_KM_NEXT_WEEK <- rowMeans(QS[,c("MO_laufen","km_next_week")])
+
+motLauf <-aov(MO_laufen_KM_NEXT_WEEK~bedingung,data=QS)
+summary(motLauf)
+
+motLauf <-aov(MO_laufen~bedingung,data=QS)
+summary(motLauf)
+
+motLauf <-aov(km_next_week~bedingung,data=QS)
+summary(motLauf)
+
+motLauf <-aov(diff_rs~bedingung,data=QS)
+summary(motLauf)
+
+motLauf <-aov(diff~bedingung,data=QS)
+summary(motLauf)
+
+
+library(ez)
+
+motlauf <- ezANOVA(QS, # specify data frame
+                     dv = MO_laufen_ges, # specify dependent variable 
+                     wid = VPN, # specify the subject variable
+                     between  = bedingung,
+                     detailed = TRUE # get a detailed table that includes SS
+                     )
+print(motlauf)
+```
+
+
+### Planned Contrasts      
+
+```{r}
+levels(QS$bedingung)
+QS$bedingungW <- QS$bedingung    
+     
+     mat <- cbind("all vs contrl"   = c(-1,-1,-1,3),
+                  "Auf+Ab vs gleich"= c(-1,-1, 2,0),
+                  "Auf vs Ab"       = c( 1,-1, 0,0))
+     
+     contrasts(QS$bedingungW) <- mat
+     motLauf <- aov(MO_laufen_ges~bedingungW,data=QS)
+     summary(motLauf,split = list(bedingungW = list("all vs contrl" = 1,
+                                                   "Auf+Ab vs gleich" = 2,
+                                                   "Auf vs Ab" = 3)))
+```
+
+### TukeyHSD
+
+```{r}
+TukeyHSD(motLauf)
+```
+
+
+#### Vorrausetzungen testen
+
+```{r}
+par(mfrow=c(2,2))
+plot(motLauf)
+```
+
+
+##### Normalverteilung der Residuen
+
+```{r}
+hist(motLauf$residuals)
+
+          # Extract the residuals
+            aov_residuals <- residuals(object = motLauf)
+          # Run Shapiro-Wilk test
+            shapiro.test(x = aov_residuals) 
+
+```
+
+ Es liegt **keine** Normalverteilung vor, jedoch ist ANOVA robust gegen Verletzungen der Normalverteilungsannahme.
+ 
+ 
+##### Varianz Homogenti?t
+
+
+Deskriptive Varianzen in den Bedingungen:
+
+```{r}
+table(QS$bedingung)
+by(QS$MO_laufen_ges,QS$bedingung,var)
+```      
+      
+      
+Varianzhomogenit?tstests:
+
+```{r}
+      
+          # Bartlett Test of Homogeneity of Variances
+            bartlett.test(MO_laufen_ges~bedingung,data=QS)
+          
+          # Figner-Killeen Test of Homogeneity of Variances
+           fligner.test(MO_laufen_ges~bedingung,data=QS)
+          
+          # LeveneTest of Homogeneity of Variance
+           leveneTest(MO_laufen_ges~bedingung,data=QS, center = median)
+          
+          # Brown-Forsyth Test of Homogeneity of Variance
+           hov(MO_laufen_ges~bedingung,data=QS)
+```
+
+Alle vier Test zeigen an, dass  Varianzhomogenit?t vorliegt.
+      
+  
+     
+## MANOVA - Motivation zu tracken 
+
+### Deskriptive Werte 
+      
+```{r}
+  describeBy(QS[,33:37],group = QS$bedingung) 
+  describe(QS[,33:37]) %>% knitr::kable()
+
+          corr.test(QS[,c("MO_tracking_self_entertainment",                                                   
+                    "MO_tracking_self_association",                                                   
+                    "MO_tracking_self_design",
+                    "MO_tracking_self_discipline",                                                   
+                    "MO_tracking_self_healing")]) %>% print(.,short=FALSE)
+          
+
+          
+         
+```     
+
+
+### Plots
+
+#### Verteilungs - Plots
+
+```{r , echo = FALSE}
+
+
+
+dimMT <- QS[,33:37] %>% melt()
+
+levels(dimMT$variable) <- c("Entertainment",
+                           "Association",
+                           "Design",
+                           "Discipline",
+                           "Healing")
+
+means <- dimMT %>% group_by(.,variable) %>%  dplyr::summarize(., mean = mean(value),median = median(value))
+
+
+ggplot(dimMT, aes(x=value, fill=bedingung)) +
+          geom_histogram(aes(y=..density..),      # Histogram with density instead of count on y-axis
+                   binwidth=.5,
+                   colour="black", fill="grey80") +
+          geom_density(alpha=0.6,fill="royalblue1") +
+          facet_grid(. ~ variable ) +
+          geom_vline(data=means, aes(xintercept=mean), color="red", linetype="dashed", size=1) +
+          geom_vline(data=means, aes(xintercept=median), color="blue", linetype="dashed", size=1) +
+          scale_y_continuous(expand=c(0,0), limits = c(0, 0.47) ) +
+          scale_x_continuous(expand=c(0,0), limits = c(1, 7) ) +
+          theme_bw() +
+          labs(
+            title = "Verteilung der Motivation zu tracken  Dimensionen ",
+            x = "Motivation zu Tracken",
+            y = "H?ufigkeit",
+            fill = "Scale",
+            color = NULL
+          )
+
+#ggsave("plotMotivationszutrackenDistributions.png",dpi=900,width=15,height=6, units = "cm",bg = "transparent")
+         
+```
+
+
+#### Bar - Plots
+
+```{r , echo = FALSE}
+vars <- c("MO_tracking_self_entertainment","MO_tracking_self_association",
+          "MO_tracking_self_design","MO_tracking_self_discipline",
+          "MO_tracking_self_healing")
+
+
+
+
+QSMelt <- QS[,c("bedingung",vars)] %>% reshape2::melt(., id = c("bedingung"), measured = vars)
+
+names(QSMelt)<-c("Group", "Outcome_Measure", "Frequency")
+
+
+
+
+
+id <- QSMelt %>% group_by(.,Group,Outcome_Measure) %>% 
+             dplyr::summarize(., mean    = mean(Frequency),
+                                 se      = sd(Frequency)/sqrt(length(Frequency)))  
+
+QSMelt$row <- 1:nrow(QSMelt)
+
+levels(id$Outcome_Measure) <- c("Self-Entertainment","Self-Association","Self-Design","Self-Discipline","Self-Healing")
+
+ggplot(id, aes(x=Group, y=mean, fill = Outcome_Measure)) +
+    geom_bar(position=position_dodge(), stat="identity",colour="black") +
+    scale_fill_manual(values=c("grey80","grey70","grey60", "grey50" ,"grey40")) +
+    scale_y_continuous("Motivation to track", expand=c(0,0), limits = c(0, 6.5) ) +
+    scale_x_discrete(name="Condition", labels=c("upwards", "downwards","equal","control")) +
+    geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, alpha = .4, position=position_dodge(.9)) +
+    theme_bw() +
+        labs(
+          #title = "Correct Rejection Rate ",
+          # x = "Bedingungen",
+          # y = "Motivation zu laufen",
+          fill = "Scale",
+          color = NULL
+        ) 
+          
+#ggsave("plotMotivationszutracken.png",dpi=900,width=15,height=6, units = "cm",bg = "transparent")
+          
+```
+
+
+#### Box - Plots
+
+```{r , echo = FALSE}
+QSBoxplot <- ggplot(QSMelt, aes(Group, Frequency, fill = Outcome_Measure))
+QSBoxplot + geom_boxplot() + labs(x = "Bedingung", y = "Motivation", colour = "Outcome Measure") + scale_y_continuous(breaks = seq(0, 20, by = 2))
+```
+
+
+### Annahmen
+
+
+```{r, echo =FALSE }
+
+temp <- QS[,c("bedingung",vars)]
+
+auf <- filter(temp, bedingung == "upwards") %>% dplyr::select(.,-bedingung) %>% as.matrix %>% t()
+ab  <- filter(temp, bedingung == "downwards") %>% dplyr::select(.,-bedingung) %>% as.matrix %>% t()
+gleich <- filter(temp, bedingung == "equal") %>% dplyr::select(.,-bedingung) %>% as.matrix %>% t()
+kontrolle <- filter(temp, bedingung == "control") %>% dplyr::select(.,-bedingung) %>% as.matrix %>% t()
+
+mshapiro.test(auf)
+mshapiro.test(ab)
+mshapiro.test(gleich)
+mshapiro.test(kontrolle)
+
+aq.plot(temp[, 2:6])
+
+```
+
+
+
+### MANOVA
+
+```{r}
+     dependent.vars <- cbind("Self-Entertainmet" = QS$MO_tracking_self_entertainment,
+                             "Self-Association"  = QS$MO_tracking_self_association,
+                             "Self-Design"       = QS$MO_tracking_self_design,
+                             "Self-Discipline"   = QS$MO_tracking_self_discipline,
+                             "Self-Healing"      = QS$MO_tracking_self_healing)
+     
+     
+     manova_motTrack <- manova(dependent.vars ~ QS$bedingung)
+     summary(manova_motTrack,test = "Pillai") 
+     summary(manova_motTrack,test = "Roy") 
+```
+
+ Mit Roy  signifkant ...
+     
+### Robust MANOVA
+
+```{r}
+QSMelt<- QS %>% dplyr::select(.,bedingung,MO_tracking_self_entertainment:MO_tracking_self_healing) %>% arrange(.,bedingung) 
+
+QSMelt$row <- c(c(1:41),c(1:41),c(1:43),c(1:44))
+
+QSMelt <-  reshape2::melt(QSMelt, id = c("bedingung","row"),
+                          measured = c("MO_tracking_self_entertainment",                                                                                 "MO_tracking_self_association",
+                                       "MO_tracking_self_design",
+                                       "MO_tracking_self_discipline",
+                                       "MO_tracking_self_healing"))
+
+QSrobust <-reshape2::dcast(QSMelt, row ~  bedingung + variable, value = "value")
+QSrobust$row<-NULL
+
+cmanova(4,5,QSrobust)
+mulrank(4,5,QSrobust)
+```
+
+
+### Post-Hoc ANOVAS
+
+
+```{r}
+summary.aov(manova_motTrack)
+```
+
+## Explorative Analysen
+
+### MANCOVA
+
+```{r}
+dependent.vars <- cbind("Self-Entertainmet" = QS$MO_tracking_self_entertainment,
+                             "Self-Association"  = QS$MO_tracking_self_association,
+                             "Self-Design"       = QS$MO_tracking_self_design,
+                             "Self-Discipline"   = QS$MO_tracking_self_discipline,
+                             "Self-Healing"      = QS$MO_tracking_self_healing)
+     
+     
+     mancova_motTrack <- manova(dependent.vars ~ QS$bedingung+ QS$km_per_week+ QS$lauferfahrung)
+     summary(manova_motTrack,test = "Pillai") 
+     summary(manova_motTrack,test = "Roy") 
+     
+     
+     summary.aov(mancova_motTrack)
+```
+
+#### Correlations
+
+```{r}
+
+# Self-Design
+
+ggplot(QS,aes(x=lauferfahrung, y=MO_tracking_self_design)) +
+  geom_point()  + 
+  stat_smooth(method=lm) +
+  annotate("text", label=paste("r =",round(
+    cor(QS$lauferfahrung,QS$MO_tracking_self_design,use="complete.obs"),2), " p = .02")
+    , x=92, y=7) +
+   theme_bw() + 
+        labs(
+          title = "Self-Design",
+          x = "Lauferfahrung",
+          y = "Self-Design",
+          color = NULL
+        )
+
+#ggsave("Self-Design.png",dpi=900,width=15,height=7, units = "cm",bg = "transparent")
+
+
+corr.test(cbind(QS$lauferfahrung,QS$MO_tracking_self_design))
+
+# 
+
+
+# Self-Discpline
+
+
+
+ggplot(QS,aes(x=lauferfahrung, y=MO_tracking_self_design)) +
+  geom_point()  + 
+  stat_smooth(method=lm) +
+  annotate("text", label=paste("r =",round(
+    cor(QS$lauferfahrung,QS$MO_tracking_self_design,use="complete.obs"),2), " p = .02")
+    , x=92, y=7) +
+   theme_bw() + 
+        labs(
+          title = "Self-Design",
+          x = "Lauferfahrung",
+          y = "Self-Design",
+          color = NULL
+        )
+
+#ggsave("Self-Design.png",dpi=900,width=15,height=7, units = "cm",bg = "transparent")
+
+```
+
+
+
+
+### LDA 
+
+```{r}
+table(QS$bedingung)
+QSlda<-lda(bedingung ~ MO_tracking_self_entertainment + MO_tracking_self_association +
+                       MO_tracking_self_design + MO_tracking_self_discipline +
+                       MO_tracking_self_healing, data = QS)
+
+#prior = c(42,42,46,44)/nrow(QS)
+
+QSlda
+
+
+plot(QSlda, 
+     panel = function(x, y, ...) {
+       points(x, y, ...)
+       text(x,y,labels=seq_along(x),...) ## You change labels here 
+      }
+      ,
+     col = as.integer(QS$bedingung), pch = 20)
+
+
+
+
+
+plot(QSlda, dimen = 2,
+     panel = function(x, y, ...) {
+       points(x, y, ...)
+       text(x,y,labels=seq_along(x),...) ## You change labels here 
+      }
+      ,
+     col = as.integer(QS$bedingung), pch = 20)
+
+
+
+QS.lda.values <- predict(QSlda)
+
+
+ldahist(data = QS.lda.values$x[,1], g=QS$bedingung)
+
+ldahist(data = QS.lda.values$x[,2], g=QS$bedingung)
+
+ldahist(data = QS.lda.values$x[,3], g=QS$bedingung)
+
+```
+
+
+# Factor Analysis and Reliability of the Motivation to Track Questionnaire from Gimpel et al. 
+
+
+
+## Conf. Factor Analysis (unkorreliert)
+
+```{r}
+mot_track <- QS[,11:29]
+names(mot_track)
+## Model
+
+Mo_track.model <- ' 
+
+self_entertainment  =~ MO_tracking_01 + MO_tracking_02 + MO_tracking_03 +  MO_tracking_04 + MO_tracking_05
+self_association    =~ MO_tracking_06 + MO_tracking_07 + MO_tracking_08 +  MO_tracking_09
+self_design         =~ MO_tracking_10 + MO_tracking_11 + MO_tracking_12 +  MO_tracking_13 + MO_tracking_14
+self_discipline     =~ MO_tracking_15 + MO_tracking_16 + MO_tracking_17
+self_healing        =~ MO_tracking_18 + MO_tracking_19
+
+
+# orthogonal factors
+self_association ~~ 0*self_entertainment
+self_design ~~ 0*self_entertainment
+self_discipline ~~ 0*self_entertainment
+self_healing ~~ 0*self_entertainment
+self_design ~~ 0*self_association
+self_discipline  ~~ 0*self_association
+self_healing ~~ 0*self_association
+self_discipline  ~~ 0*self_design
+self_healing ~~ 0*self_design
+self_healing ~~ 0*self_discipline
+
+
+'
+
+## Fit
+
+fit <- cfa(Mo_track.model, data=mot_track)
+
+## Results
+
+
+summary(fit, fit.measures=TRUE)
+
+
+
+```
+
+
+##  Principal Axis Factor Analysis
+
+```{r}
+library(psych)
+
+fa.parallel(mot_track, fa = "fa")
+
+
+
+fit <- fa(mot_track, nfactors = 5, fm = "pa", rotate = "varimax")
+print(fit, sort = FALSE, cut = .3)
+
+
+fit <- fa(mot_track, nfactors = 5, fm = "pa", rotate = "Promax")
+print(fit, sort = FALSE, cut = .3)
+```
+
+
+## Conf. Factor Analysis korreliert)
+
+```{r}
+mot_track <- QS[,11:29]
+names(mot_track)
+## Model
+
+Mo_track.model <- ' 
+
+self_entertainment  =~ MO_tracking_01 + MO_tracking_02 + MO_tracking_03 +  MO_tracking_04 + MO_tracking_05
+self_association    =~ MO_tracking_06 + MO_tracking_07 + MO_tracking_08 +  MO_tracking_09
+self_design         =~ MO_tracking_10 + MO_tracking_11 + MO_tracking_12 +  MO_tracking_13 + MO_tracking_14
+self_discipline     =~ MO_tracking_15 + MO_tracking_16 + MO_tracking_17
+self_healing        =~ MO_tracking_18 + MO_tracking_19
+
+
+# orthogonal factors
+self_association ~~ self_entertainment
+self_design ~~ self_entertainment
+self_discipline ~~ self_entertainment
+self_healing ~~ self_entertainment
+self_design ~~ self_association
+self_discipline  ~~ self_association
+self_healing ~~ self_association
+self_discipline  ~~ self_design
+self_healing ~~ self_design
+self_healing ~~ self_discipline
+
+
+'
+
+## Fit
+
+fit <- cfa(Mo_track.model, data=mot_track)
+
+## Results
+
+
+summary(fit, fit.measures=TRUE)
+
+
+
+```
+
+
