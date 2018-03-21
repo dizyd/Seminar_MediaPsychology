@@ -1,7 +1,7 @@
 ---
 title: "Medienseminar - Happy Feet - QS"
 author: "David Izydorczyk, J. A., M. G., K. K., M. Z., N. B. "
-date: '2018-03-20'
+date: '2018-03-21'
 output:
   html_document:
     code_folding: show
@@ -1087,10 +1087,6 @@ ggplot(id, aes(x=bedingung, y=mean,fill=bedingung)) +
         ) + guides(fill=FALSE)
 ```
 
-```
-## Warning: Removed 3 rows containing missing values (geom_point).
-```
-
 ![](Auswertung_QS_files/figure-html/unnamed-chunk-29-1.png)<!-- -->
 
 ```r
@@ -1202,18 +1198,6 @@ motlauf <- ezANOVA(QS, # specify data frame
                      between  = bedingung,
                      detailed = TRUE # get a detailed table that includes SS
                      )
-```
-
-```
-## Warning: Converting "VPN" to factor for ANOVA.
-```
-
-```
-## Warning: Data is unbalanced (unequal N per group). Make sure you specified
-## a well-considered value for the type argument to ezANOVA().
-```
-
-```r
 print(motlauf)
 ```
 
@@ -1607,11 +1591,6 @@ MO_tracking_self_healing             5   169   2.464497   1.416919   2.000000   
 ### Plots
 
 #### Verteilungs - Plots
-
-
-```
-## No id variables; using all as measure variables
-```
 
 ![](Auswertung_QS_files/figure-html/unnamed-chunk-38-1.png)<!-- -->
 
@@ -2139,14 +2118,7 @@ self_healing ~~ 0*self_discipline
 ## Fit
 
 fit <- cfa(Mo_track.model, data=mot_track)
-```
 
-```
-## Warning in lav_model_vcov(lavmodel = lavmodel, lavsamplestats = lavsamplestats, : lavaan WARNING: could not compute standard errors!
-##   lavaan NOTE: this may be a symptom that the model is not identified.
-```
-
-```r
 ## Results
 
 
@@ -2349,15 +2321,6 @@ print(fit, sort = FALSE, cut = .3)
 
 ```r
 fit <- fa(mot_track, nfactors = 5, fm = "pa", rotate = "Promax")
-```
-
-```
-## Warning in fac(r = r, nfactors = nfactors, n.obs = n.obs, rotate =
-## rotate, : A loading greater than abs(1) was detected. Examine the loadings
-## carefully.
-```
-
-```r
 print(fit, sort = FALSE, cut = .3)
 ```
 
